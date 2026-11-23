@@ -1,0 +1,107 @@
+# Lane routing policy. Hard rules set a FLOOR; the LLM can raise a change above it, never below.
+# Lanes, least to most gated:
+#   agentic       CI checks only; an agent may author and merge
+#   ai_assisted   CI checks + one human code review
+#   human_in_loop CI checks + code review + business sign-off + gated production environment
+#
+# Patterns use fnmatch semantics: "*" also matches "/", so "**" reads naturally.
+# A file that matches several rules takes the strictest floor.
+
+default_floor: ai_assisted   # an unmapped path never defaults to agentic
+
+agentic_limits:              # even agentic-eligible changes must stay small
+  max_files: 10
+  max_lines: 200
+
+escalation:
+  failures_to_escalate: 2    # validation failures on the same PR before it moves up one lane
+
+rules:
+  # --- Guardrails: agents never edit the pipeline that constrains them ---
+  - name: pipeline-guardrails
+    floor: human_in_loop
+    paths:
+      - ".github/*"
+      - "gtm-release-control/classifier/*"
+      - "gtm-release-control/gate/*"
+      - "gtm-release-control/evidence/*"
+      - "gtm-release-control/agents/*"
+      - "gtm-release-control/infra/*"
+      - "CODEOWNERS"
+    reason: Changes to the pipeline's own controls need the owners and a business approver.
+
+  # --- Salesforce security model ---
+  - name: security-model
+    floor: human_in_loop
+    paths:
+      - "*force-app/*/profiles/*"
+      - "*force-app/*/permissionsets/*"
+      - "*force-app/*/permissionsetgroups/*"
+      - "*force-app/*/sharingRules/*"
+      - "*force-app/*/roles/*"
+      - "*force-app/*/customPermissions/*"
+      - "*force-app/*/connectedApps/*"
+      - "*force-app/*/namedCredentials/*"
+    reason: Who can see or change data is a SOX access control.
+
+  # --- Revenue objects and CPQ ---
+  - name: revenue-objects
+    floor: human_in_loop
+    paths:
+      - "*force-app/*/objects/Opportunity/*"
+      - "*force-app/*/objects/OpportunityLineItem/*"
+      - "*force-app/*/objects/Quote/*"
+      - "*force-app/*/objects/Contract/*"
+      - "*force-app/*/objects/Order/*"
+      - "*force-app/*/objects/SBQQ__*"
+      - "*force-app/*/flows/*Opportunity*"
+      - "*force-app/*/flows/*Quote*"
+      - "*force-app/*/flows/*Order*"
+    reason: Touches bookings, pricing or quote-to-cash data.
+
+  - name: destructive-changes
+    floor: human_in_loop
+    paths:
+      - "*destructiveChanges*.xml"
+    reason: Deletes metadata; rollback may not restore data.
+
+  # --- Code ---
+  - name: apex
+    floor: ai_assisted
+    paths:
+      - "*force-app/*/classes/*"
+      - "*force-app/*/triggers/*"
+    reason: Apex runs in every transaction on its object; needs a reviewer.
+
+  - name: lwc-and-flows
+    floor: ai_assisted
+    paths:
+      - "*force-app/*/lwc/*"
+      - "*force-app/*/aura/*"
+      - "*force-app/*/flows/*"
+    reason: User-facing behaviour or automation.
+
+  - name: custom-apps
+    floor: ai_assisted
+    paths:
+      - "gtm-release-control/apps/*"
+    reason: Internal application code.
+
+  # --- Low risk ---
+  - name: labels-and-layouts
+    floor: agentic
+    paths:
+      - "*force-app/*/labels/*"
+      - "*force-app/*/layouts/*"
+      - "*force-app/*/flexipages/*"
+      - "*force-app/*/reports/*"
+      - "*force-app/*/dashboards/*"
+    reason: Presentation only; reversible.
+
+  - name: docs-and-tests
+    floor: agentic
+    paths:
+      - "gtm-release-control/docs/*"
+      - "*.md"
+      - "gtm-release-control/tests/*"
+    reason: No production runtime effect.

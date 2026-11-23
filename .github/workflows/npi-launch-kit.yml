@@ -1,0 +1,62 @@
+name: npi-launch-kit
+
+on:
+  pull_request:
+    paths: ["npi-launch-kit/**", ".github/workflows/npi-launch-kit.yml"]
+  push:
+    paths: ["npi-launch-kit/**", ".github/workflows/npi-launch-kit.yml"]
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: npi-launch-kit
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  example-launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      E: examples/insights-launch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+
+      - name: Validate spec
+        run: python -m npi validate "$E/spec.yaml"
+
+      - name: Scenario suite
+        run: python -m npi scenarios "$E/spec.yaml" "$E/scenarios.yaml"
+
+      - name: Catalog change set
+        run: python -m npi catalog "$E/spec.yaml" --current "$E/current_catalog.csv" --out build/catalog
+
+      - name: Readiness report (example is NO-GO on purpose)
+        run: |
+          python -m npi readiness "$E/spec.yaml" "$E/tracker.yaml" --today 2027-02-20 --out build/readiness.md || [ $? -eq 2 ]
+          cat build/readiness.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reconciliation (example has planted defects on purpose)
+        run: |
+          python -m npi reconcile "$E/spec.yaml" "$E/post_launch" --out build/reconcile.md || true
+          cat build/reconcile.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launch-artifacts
+          path: npi-launch-kit/build/

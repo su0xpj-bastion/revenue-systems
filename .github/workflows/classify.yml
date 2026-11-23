@@ -1,0 +1,112 @@
+name: classify
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: classify-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    name: classify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The classifier runs from the BASE branch. A PR cannot edit the code that routes it.
+      - name: Check out pipeline tooling (base)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: tooling
+
+      - name: Check out change under review (head)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          path: pr
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r tooling/gtm-release-control/requirements.txt
+
+      - name: Labeler token (GitHub App, so label events trigger the gate)
+        id: app
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.CLASSIFIER_APP_ID }}
+          private-key: ${{ secrets.CLASSIFIER_APP_KEY }}
+
+      - name: Current lane and prior validation failures
+        id: context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          current=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels \
+            --jq '[.labels[].name | select(startswith("lane:"))][0] // "" | ltrimstr("lane:")')
+          failures=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow validate-sf.yml \
+            --branch "$HEAD_REF" --status failure --limit 50 --json databaseId --jq 'length')
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "failures=$failures" >> "$GITHUB_OUTPUT"
+
+      - name: Classify
+        id: classify
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AGENT_LANE_ENABLED: ${{ vars.AGENT_LANE_ENABLED || 'true' }}
+        run: |
+          current_arg=()
+          if [ -n "${{ steps.context.outputs.current }}" ]; then
+            current_arg=(--current-lane "${{ steps.context.outputs.current }}")
+          fi
+          python tooling/gtm-release-control/classifier/classify.py \
+            --repo-dir pr \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            --failures "${{ steps.context.outputs.failures }}" \
+            --output classification.json \
+            "${current_arg[@]}"
+
+      - name: Apply lane label
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ github.event.pull_request.number }}
+          LANE: ${{ steps.classify.outputs.lane }}
+        run: |
+          for lane in agentic ai_assisted human_in_loop; do
+            gh label create "lane:$lane" --repo "$GITHUB_REPOSITORY" --force >/dev/null
+            if [ "$lane" != "$LANE" ]; then
+              gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --remove-label "lane:$lane" >/dev/null 2>&1 || true
+            fi
+          done
+          gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --add-label "lane:$LANE"
+
+      - name: Summary
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("classification.json"))
+          print(f"### Lane: `{d['lane']}`")
+          print(f"floor `{d['floor_lane']}` · LLM `{d['llm_lane']}` · risk {d['risk_score']}")
+          print()
+          print(d["rationale"] or "_no LLM rationale_")
+          print()
+          for r in d["reasons"]:
+              print(f"- {r}")
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: classification
+          path: classification.json
+          retention-days: 90

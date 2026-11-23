@@ -1,0 +1,48 @@
+name: ledger-append
+description: Verify the evidence ledger, append one entry, push it to the protected evidence-ledger branch.
+inputs:
+  event:
+    description: Event name (deploy, rollback, ...)
+    required: true
+  data-file:
+    description: JSON file with the entry's data
+    required: true
+  token:
+    description: Token with contents:write on this repository
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Append to ledger
+      shell: bash
+      env:
+        EVENT: ${{ inputs.event }}
+        DATA_FILE: ${{ inputs.data-file }}
+        GH_TOKEN: ${{ inputs.token }}
+      working-directory: gtm-release-control
+      run: |
+        set -euo pipefail
+        remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        rm -rf ledger-store
+        if git ls-remote --exit-code --heads "$remote" evidence-ledger >/dev/null 2>&1; then
+          git clone --quiet --branch evidence-ledger --single-branch "$remote" ledger-store
+        else
+          git init --quiet -b evidence-ledger ledger-store
+          git -C ledger-store remote add origin "$remote"
+        fi
+
+        # Refuse to extend a chain that has already been tampered with.
+        python evidence/ledger.py verify --ledger ledger-store/ledger.jsonl
+        python evidence/ledger.py append --ledger ledger-store/ledger.jsonl \
+          --event "$EVENT" --data-file "$DATA_FILE"
+        status="$(python evidence/ledger.py verify --ledger ledger-store/ledger.jsonl | tail -n 1)"
+
+        git -C ledger-store add ledger.jsonl
+        git -C ledger-store -c user.name="gtm-release-control" -c user.email="noreply@github.com" \
+          commit --quiet -m "ledger: ${EVENT} ${GITHUB_SHA::7}"
+        git -C ledger-store push --quiet origin evidence-ledger
+
+        {
+          echo "### Evidence ledger"
+          echo "Event \`${EVENT}\` appended. \`${status}\`"
+        } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>CPQ twin field: copied from Product2.Max_Discount_Pct__c when the line is added.</description>
+    <fullName>Max_Discount_Pct__c</fullName>
+    <label>Max Discount</label>
+    <precision>5</precision>
+    <required>false</required>
+    <scale>2</scale>
+    <type>Percent</type>
+</CustomField>

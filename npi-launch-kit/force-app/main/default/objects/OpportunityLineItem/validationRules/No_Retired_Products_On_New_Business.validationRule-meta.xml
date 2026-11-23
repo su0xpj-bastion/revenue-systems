@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>No_Retired_Products_On_New_Business</fullName>
+    <active>true</active>
+    <description>Retired SKUs can still renew until end of renewal, but cannot be added to new business. The renewal opportunity type value is org-specific; adjust the CONTAINS check to match.</description>
+    <errorConditionFormula>AND(
+    ISNEW(),
+    NOT(ISBLANK(Product2.End_of_Sale_Date__c)),
+    Opportunity.CloseDate &gt;= Product2.End_of_Sale_Date__c,
+    NOT(CONTAINS(TEXT(Opportunity.Type), &quot;Renewal&quot;))
+)</errorConditionFormula>
+    <errorMessage>This product is past its end-of-sale date and can only be renewed. Quote its replacement instead.</errorMessage>
+</ValidationRule>

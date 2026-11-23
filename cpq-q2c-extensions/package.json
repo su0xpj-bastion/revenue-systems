@@ -1,0 +1,14 @@
+{
+  "name": "cpq-q2c-extensions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'qcp/test/*.test.js'",
+    "apex:syntax": "node scripts/apex-syntax-check.mjs",
+    "qcp:record": "node scripts/build-qcp-record.mjs",
+    "vectors:check": "node scripts/check-vectors-sync.mjs"
+  },
+  "devDependencies": {
+    "@apexdevtools/apex-parser": "5.3.0"
+  }
+}

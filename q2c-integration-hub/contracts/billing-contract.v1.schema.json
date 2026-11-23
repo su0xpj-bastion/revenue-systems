@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "q2c.billing-contract.v1",
+  "title": "Billing's view of a contract (GET /v1/contracts/{contractId}), read by reconciliation",
+  "type": "object",
+  "required": ["contractId", "version", "status", "lines"],
+  "properties": {
+    "contractId": { "type": "string" },
+    "version": { "type": "integer" },
+    "status": { "enum": ["active", "cancelled"] },
+    "lines": { "$ref": "q2c.contract.v1#/properties/lines" }
+  }
+}

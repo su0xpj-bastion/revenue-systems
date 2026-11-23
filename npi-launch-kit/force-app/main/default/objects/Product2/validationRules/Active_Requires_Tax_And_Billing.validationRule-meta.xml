@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Active_Requires_Tax_And_Billing</fullName>
+    <active>true</active>
+    <description>A sellable product must be billable and taxable on day one. Bundle parents carry no charge of their own.</description>
+    <errorConditionFormula>AND(
+    IsActive,
+    OR(
+        ISBLANK(TEXT(Billing_Model__c)),
+        AND(NOT(ISPICKVAL(Billing_Model__c, &quot;Bundle&quot;)), ISBLANK(Tax_Code__c))
+    )
+)</errorConditionFormula>
+    <errorDisplayField>Tax_Code__c</errorDisplayField>
+    <errorMessage>Active products need a Billing Model and, unless they are a bundle, a Tax Code from the Tax team.</errorMessage>
+</ValidationRule>

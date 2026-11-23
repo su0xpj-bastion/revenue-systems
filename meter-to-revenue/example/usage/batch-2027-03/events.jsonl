@@ -1,0 +1,6 @@
+{"event_id": "evt-0001", "customer": "C-ACME", "meter": "api_tokens", "quantity": 50, "timestamp": "2027-03-05T10:00:00Z"}
+{"event_id": "evt-0002", "customer": "C-ACME", "meter": "api_tokens", "quantity": 100, "timestamp": "2027-03-20T10:00:00Z"}
+{"event_id": "evt-0003", "customer": "C-GLOBEX", "meter": "api_tokens", "quantity": 600, "timestamp": "2027-03-10T10:00:00Z"}
+{"event_id": "evt-0004", "customer": "C-GLOBEX", "meter": "api_tokens", "quantity": 600, "timestamp": "2027-03-25T10:00:00Z"}
+{"event_id": "evt-0005", "customer": "C-INITECH", "meter": "api_tokens", "quantity": 100, "timestamp": "2027-03-15T10:00:00Z"}
+{"event_id": "evt-0002", "customer": "C-ACME", "meter": "api_tokens", "quantity": 100, "timestamp": "2027-03-20T10:00:00Z"}

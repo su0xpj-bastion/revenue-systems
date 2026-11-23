@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "q2c.agreement.v1",
+  "title": "Agreement request sent to CLM (PUT /v1/agreements/by-reference/{contractId}, POST .../void)",
+  "description": "CLM keys agreements by externalReference (the Salesforce contract Id), so a re-send updates the same agreement instead of creating a second one.",
+  "type": "object",
+  "required": ["schema", "operation", "contractId", "externalReference", "version", "status", "lines"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "q2c.agreement.v1" },
+    "operation": { "enum": ["upsert_agreement", "void_agreement"] },
+    "contractId": { "type": "string", "pattern": "^[a-zA-Z0-9]{18}$" },
+    "externalReference": { "type": "string", "pattern": "^[a-zA-Z0-9]{18}$" },
+    "agreementId": { "type": "string" },
+    "title": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["Out_For_Signature", "Cancelled"] },
+    "lines": { "$ref": "q2c.contract.v1#/properties/lines" }
+  }
+}

@@ -1,0 +1,171 @@
+name: validate-sf
+
+# No `paths:` filter: required checks on a filtered workflow never report and block every
+# unrelated PR. Instead every job runs, and Salesforce jobs SKIP when nothing in force-app
+# changed. A skipped job satisfies a required check.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-sf-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: gtm-release-control
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      salesforce: ${{ steps.diff.outputs.salesforce }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" \
+              | grep -qE '^gtm-release-control/(force-app/|sfdx-project.json|config/)'; then
+            echo "salesforce=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "salesforce=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  apex-tests:
+    name: apex-tests
+    needs: changes
+    if: needs.changes.outputs.salesforce == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/sf-setup
+        with:
+          client-id: ${{ secrets.SF_DEVHUB_CLIENT_ID }}
+          jwt-key: ${{ secrets.SF_DEVHUB_JWT_KEY }}
+          username: ${{ secrets.SF_DEVHUB_USERNAME }}
+          alias: devhub
+          dev-hub: "true"
+
+      # Throwaway org per PR: the change never touches a shared sandbox until it passes here.
+      - name: Create scratch org
+        run: |
+          sf org create scratch \
+            --definition-file config/project-scratch-def.json \
+            --alias ci-scratch --set-default \
+            --duration-days 1 --wait 15
+
+      - name: Deploy source to scratch org
+        run: sf project deploy start --target-org ci-scratch --wait 30
+
+      - name: Run Apex tests with coverage
+        run: |
+          sf apex run test --target-org ci-scratch \
+            --test-level RunLocalTests --code-coverage \
+            --wait 30 --json > apex-results.json || true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Coverage gate (85%)
+        run: python ci/coverage_gate.py apex-results.json --min-coverage 85
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-results
+          path: gtm-release-control/apex-results.json
+          retention-days: 90
+
+      - name: Delete scratch org
+        if: always()
+        run: sf org delete scratch --target-org ci-scratch --no-prompt || true
+
+  static-analysis:
+    name: static-analysis
+    needs: changes
+    if: needs.changes.outputs.salesforce == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Salesforce Code Analyzer
+        run: |
+          npm install --global @salesforce/cli
+          sf plugins install code-analyzer
+          sf code-analyzer run \
+            --workspace force-app \
+            --rule-selector Recommended \
+            --severity-threshold 2 \
+            --output-file code-analyzer.html
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-analyzer
+          path: gtm-release-control/code-analyzer.html
+          retention-days: 90
+
+  # Check-only deploy against production with RunLocalTests. Produces a validated deploy ID
+  # that deploy.yml quick-deploys after merge: the exact artifact that was validated ships.
+  prod-validate:
+    name: prod-validate
+    needs: [changes, apex-tests, static-analysis]
+    if: needs.changes.outputs.salesforce == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: prod-validate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/sf-setup
+        with:
+          client-id: ${{ secrets.SF_PROD_CLIENT_ID }}
+          jwt-key: ${{ secrets.SF_PROD_JWT_KEY }}
+          username: ${{ secrets.SF_PROD_USERNAME }}
+          alias: prod
+
+      - name: Build delta package
+        run: |
+          mkdir -p .delta
+          sf sgd source delta \
+            --from "${{ github.event.pull_request.base.sha }}" \
+            --to "${{ github.event.pull_request.head.sha }}" \
+            --output-dir .delta --generate-delta
+          cat .delta/package/package.xml
+          cat .delta/destructiveChanges/destructiveChanges.xml
+
+      - name: Validate against production (check-only)
+        run: |
+          if ! grep -q "<types>" .delta/package/package.xml \
+             && ! grep -q "<types>" .delta/destructiveChanges/destructiveChanges.xml; then
+            echo '{"skipped": "no deployable metadata"}' > validated-deploy.json
+            exit 0
+          fi
+          sf project deploy validate \
+            --manifest .delta/package/package.xml \
+            --post-destructive-changes .delta/destructiveChanges/destructiveChanges.xml \
+            --target-org prod --test-level RunLocalTests \
+            --wait 60 --json > validated-deploy.json
+          jq -e '.status == 0' validated-deploy.json
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-deploy
+          path: |
+            gtm-release-control/validated-deploy.json
+            gtm-release-control/.delta/
+          retention-days: 10   # Salesforce keeps a validated deploy quick-deployable for 10 days

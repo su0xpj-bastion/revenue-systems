@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "q2c.contract.v1",
+  "title": "Contract snapshot sent to Billing (PUT /v1/contracts/{contractId}, POST .../cancel)",
+  "description": "Full snapshot at one version. Billing keeps the highest version: version < stored -> 409; version == stored -> re-apply (repair); version > stored -> apply. Duplicate Idempotency-Key -> replay the first response.",
+  "type": "object",
+  "required": ["schema", "operation", "contractId", "version", "status", "lines"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "q2c.contract.v1" },
+    "operation": { "enum": ["upsert_contract", "cancel_contract"] },
+    "contractId": { "type": "string", "pattern": "^[a-zA-Z0-9]{18}$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["Signed", "Active", "Cancelled"] },
+    "billingAccountId": { "type": "string" },
+    "startDate": { "type": "string", "format": "date" },
+    "endDate": { "type": "string", "format": "date" },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lineKey", "productCode", "quantity", "unitPrice"],
+        "additionalProperties": false,
+        "properties": {
+          "lineKey": { "type": "string" },
+          "productCode": { "type": "string" },
+          "quantity": { "type": "number", "minimum": 0 },
+          "unitPrice": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

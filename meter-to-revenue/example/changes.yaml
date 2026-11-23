@@ -1,0 +1,4 @@
+# Contract change log exported from CPQ / contract management (input to control C-08).
+changes:
+  - {contract: K-GLOBEX, field: SUPPORT unit price 450 → 500, requested_by: alice, approved_by: bob, effective: 2027-03-01}
+  - {contract: K-ACME, field: SEATS quantity 15 → 20, requested_by: carol, approved_by: carol, effective: 2027-04-01}

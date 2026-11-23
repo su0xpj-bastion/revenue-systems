@@ -1,0 +1,61 @@
+{
+  "_doc": "One rule set, two runtimes: Apex (RetryPolicy, ContractStateMachine, IdempotencyKeys) and the Python simulator both run these vectors. If they disagree, CI fails.",
+  "retry": [
+    { "name": "2xx acks",                    "status": 200, "timedOut": false, "attempts": 1, "max": 8, "expect": "ACK" },
+    { "name": "201 acks",                    "status": 201, "timedOut": false, "attempts": 3, "max": 8, "expect": "ACK" },
+    { "name": "409 newer version wins",      "status": 409, "timedOut": false, "attempts": 1, "max": 8, "expect": "SUPERSEDED" },
+    { "name": "429 retries",                 "status": 429, "timedOut": false, "attempts": 1, "max": 8, "expect": "RETRY" },
+    { "name": "503 retries",                 "status": 503, "timedOut": false, "attempts": 7, "max": 8, "expect": "RETRY" },
+    { "name": "503 at max goes dead",        "status": 503, "timedOut": false, "attempts": 8, "max": 8, "expect": "DEAD" },
+    { "name": "timeout retries",             "status": 0,   "timedOut": true,  "attempts": 2, "max": 8, "expect": "RETRY" },
+    { "name": "connection error retries",    "status": 0,   "timedOut": false, "attempts": 1, "max": 8, "expect": "RETRY" },
+    { "name": "400 is a contract bug, dead", "status": 400, "timedOut": false, "attempts": 1, "max": 8, "expect": "DEAD" },
+    { "name": "401 dead, needs a human",     "status": 401, "timedOut": false, "attempts": 1, "max": 8, "expect": "DEAD" },
+    { "name": "422 dead",                    "status": 422, "timedOut": false, "attempts": 1, "max": 8, "expect": "DEAD" },
+    { "name": "408 retries",                 "status": 408, "timedOut": false, "attempts": 1, "max": 8, "expect": "RETRY" }
+  ],
+  "backoff": [
+    { "attempts": 1, "baseSeconds": 30 },
+    { "attempts": 2, "baseSeconds": 60 },
+    { "attempts": 3, "baseSeconds": 120 },
+    { "attempts": 6, "baseSeconds": 960 },
+    { "attempts": 7, "baseSeconds": 1920 },
+    { "attempts": 8, "baseSeconds": 3600 },
+    { "attempts": 20, "baseSeconds": 3600 }
+  ],
+  "transitions": [
+    { "from": "Draft",             "to": "Out_For_Signature", "ok": true },
+    { "from": "Draft",             "to": "Cancelled",         "ok": true },
+    { "from": "Draft",             "to": "Signed",            "ok": false },
+    { "from": "Draft",             "to": "Active",            "ok": false },
+    { "from": "Out_For_Signature", "to": "Draft",             "ok": true },
+    { "from": "Out_For_Signature", "to": "Signed",            "ok": true },
+    { "from": "Out_For_Signature", "to": "Cancelled",         "ok": true },
+    { "from": "Signed",            "to": "Active",            "ok": true },
+    { "from": "Signed",            "to": "Cancelled",         "ok": true },
+    { "from": "Signed",            "to": "Draft",             "ok": false },
+    { "from": "Active",            "to": "Cancelled",         "ok": true },
+    { "from": "Active",            "to": "Signed",            "ok": false },
+    { "from": "Cancelled",         "to": "Active",            "ok": false },
+    { "from": "Cancelled",         "to": "Draft",             "ok": false },
+    { "from": "Active",            "to": "Active",            "ok": true }
+  ],
+  "outbound": [
+    { "status": "Draft",             "targets": [] },
+    { "status": "Out_For_Signature", "targets": [["CLM", "upsert_agreement"]] },
+    { "status": "Signed",            "targets": [["Billing", "upsert_contract"]] },
+    { "status": "Active",            "targets": [["Billing", "upsert_contract"]] },
+    { "status": "Cancelled",         "targets": [["Billing", "cancel_contract"], ["CLM", "void_agreement"]] }
+  ],
+  "keys": [
+    { "target": "Billing", "operation": "upsert_contract", "recordId": "a01000000000001AAA", "version": 3,
+      "expect": "billing:upsert_contract:a01000000000001AAA:v3" },
+    { "target": "CLM", "operation": "upsert_agreement", "recordId": "a01000000000001AAA", "version": 1,
+      "expect": "clm:upsert_agreement:a01000000000001AAA:v1" }
+  ],
+  "inbound": [
+    { "type": "agreement.sent",   "to": "Out_For_Signature" },
+    { "type": "agreement.signed", "to": "Signed" },
+    { "type": "agreement.voided", "to": "Cancelled" }
+  ]
+}

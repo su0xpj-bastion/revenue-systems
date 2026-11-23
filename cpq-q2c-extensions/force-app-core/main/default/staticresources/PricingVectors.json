@@ -1,0 +1,487 @@
+{
+  "_comment": "Shared test vectors. The JavaScript QCP tests (node) and the Apex core tests (static resource PricingVectors) both run every case, so the two implementations cannot drift apart.",
+  "proration": [
+    {
+      "name": "monthly+daily: 2 months + 16/30 of June",
+      "method": "monthly_daily",
+      "start": "2027-04-15",
+      "end": "2027-07-01",
+      "monthly_price": 30,
+      "quantity": 10,
+      "expected": "760.00"
+    },
+    {
+      "name": "monthly+daily: full year",
+      "method": "monthly_daily",
+      "start": "2027-03-01",
+      "end": "2028-03-01",
+      "monthly_price": 30,
+      "quantity": 10,
+      "expected": "3600.00"
+    },
+    {
+      "name": "monthly+daily: Jan 31 to Mar 1 (month-end clipping)",
+      "method": "monthly_daily",
+      "start": "2027-01-31",
+      "end": "2027-03-01",
+      "monthly_price": 30,
+      "quantity": 10,
+      "expected": "310.71"
+    },
+    {
+      "name": "daily: 77 days at 12/365",
+      "method": "daily",
+      "start": "2027-04-15",
+      "end": "2027-07-01",
+      "monthly_price": 30,
+      "quantity": 10,
+      "expected": "759.45"
+    },
+    {
+      "name": "monthly: partial month rounds up",
+      "method": "monthly",
+      "start": "2027-04-15",
+      "end": "2027-07-01",
+      "monthly_price": 30,
+      "quantity": 10,
+      "expected": "900.00"
+    },
+    {
+      "name": "same day is zero",
+      "method": "monthly_daily",
+      "start": "2027-04-15",
+      "end": "2027-04-15",
+      "monthly_price": 30,
+      "quantity": 10,
+      "expected": "0.00"
+    }
+  ],
+  "renewal": [
+    {
+      "name": "uplift capped at 7%",
+      "list": 30,
+      "prior": 25,
+      "cap_pct": 7,
+      "grandfathered": false,
+      "expected": "26.75"
+    },
+    {
+      "name": "uplift cannot exceed list",
+      "list": 30,
+      "prior": 29,
+      "cap_pct": 7,
+      "grandfathered": false,
+      "expected": "30.00"
+    },
+    {
+      "name": "no prior price renews at list",
+      "list": 30,
+      "prior": null,
+      "cap_pct": 7,
+      "grandfathered": false,
+      "expected": "30.00"
+    },
+    {
+      "name": "grandfathered keeps prior price",
+      "list": 30,
+      "prior": 20,
+      "cap_pct": 7,
+      "grandfathered": true,
+      "expected": "20.00"
+    },
+    {
+      "name": "list dropped below prior: renew at list",
+      "list": 30,
+      "prior": 32,
+      "cap_pct": 7,
+      "grandfathered": false,
+      "expected": "30.00"
+    },
+    {
+      "name": "zero cap holds price flat",
+      "list": 30,
+      "prior": 25,
+      "cap_pct": 0,
+      "grandfathered": false,
+      "expected": "25.00"
+    }
+  ],
+  "approval": [
+    {
+      "name": "within rep authority",
+      "max_discount_pct": 5,
+      "floor_breach": false,
+      "payment_terms": "Net 30",
+      "term_months": 12,
+      "expected_level": 0
+    },
+    {
+      "name": "discount to Deal Desk",
+      "max_discount_pct": 15,
+      "floor_breach": false,
+      "payment_terms": "Net 30",
+      "term_months": 12,
+      "expected_level": 1
+    },
+    {
+      "name": "non-standard payment terms",
+      "max_discount_pct": 10,
+      "floor_breach": false,
+      "payment_terms": "Net 60",
+      "term_months": 12,
+      "expected_level": 1
+    },
+    {
+      "name": "discount to Finance",
+      "max_discount_pct": 25,
+      "floor_breach": false,
+      "payment_terms": "Net 30",
+      "term_months": 12,
+      "expected_level": 2
+    },
+    {
+      "name": "floor breach at small discount",
+      "max_discount_pct": 5,
+      "floor_breach": true,
+      "payment_terms": "Net 30",
+      "term_months": 12,
+      "expected_level": 2
+    },
+    {
+      "name": "term over 36 months",
+      "max_discount_pct": 10,
+      "floor_breach": false,
+      "payment_terms": "Net 30",
+      "term_months": 48,
+      "expected_level": 2
+    },
+    {
+      "name": "beyond Finance: CFO",
+      "max_discount_pct": 40,
+      "floor_breach": false,
+      "payment_terms": "Net 30",
+      "term_months": 12,
+      "expected_level": 3
+    },
+    {
+      "name": "band edge 10.00 stays with rep",
+      "max_discount_pct": 10,
+      "floor_breach": false,
+      "payment_terms": "Net 30",
+      "term_months": 36,
+      "expected_level": 0
+    },
+    {
+      "name": "missing payment terms treated as standard",
+      "max_discount_pct": 0,
+      "floor_breach": false,
+      "payment_terms": null,
+      "term_months": 12,
+      "expected_level": 0
+    }
+  ],
+  "status": [
+    {
+      "from": "Draft",
+      "to": "In Review",
+      "allowed": true
+    },
+    {
+      "from": "In Review",
+      "to": "Approved",
+      "allowed": true
+    },
+    {
+      "from": "In Review",
+      "to": "Denied",
+      "allowed": true
+    },
+    {
+      "from": "In Review",
+      "to": "Draft",
+      "allowed": true
+    },
+    {
+      "from": "Approved",
+      "to": "Presented",
+      "allowed": true
+    },
+    {
+      "from": "Approved",
+      "to": "Draft",
+      "allowed": true
+    },
+    {
+      "from": "Presented",
+      "to": "Accepted",
+      "allowed": true
+    },
+    {
+      "from": "Presented",
+      "to": "Rejected",
+      "allowed": true
+    },
+    {
+      "from": "Denied",
+      "to": "Draft",
+      "allowed": true
+    },
+    {
+      "from": "Draft",
+      "to": "Approved",
+      "allowed": false
+    },
+    {
+      "from": "Draft",
+      "to": "Accepted",
+      "allowed": false
+    },
+    {
+      "from": "In Review",
+      "to": "Presented",
+      "allowed": false
+    },
+    {
+      "from": "Accepted",
+      "to": "Draft",
+      "allowed": false
+    },
+    {
+      "from": "Rejected",
+      "to": "Accepted",
+      "allowed": false
+    }
+  ],
+  "terms": [
+    {
+      "name": "standard terms",
+      "liability_cap": "1x fees",
+      "auto_renew": true,
+      "termination_for_convenience": false,
+      "expected_level": 0,
+      "expected_legal": false
+    },
+    {
+      "name": "2x liability cap goes to Legal + Deal Desk",
+      "liability_cap": "2x fees",
+      "auto_renew": true,
+      "termination_for_convenience": false,
+      "expected_level": 1,
+      "expected_legal": true
+    },
+    {
+      "name": "uncapped liability goes to CFO",
+      "liability_cap": "Uncapped",
+      "auto_renew": true,
+      "termination_for_convenience": false,
+      "expected_level": 3,
+      "expected_legal": true
+    },
+    {
+      "name": "auto-renew off",
+      "liability_cap": "1x fees",
+      "auto_renew": false,
+      "termination_for_convenience": false,
+      "expected_level": 1,
+      "expected_legal": true
+    },
+    {
+      "name": "termination for convenience is revenue risk",
+      "liability_cap": "1x fees",
+      "auto_renew": true,
+      "termination_for_convenience": true,
+      "expected_level": 2,
+      "expected_legal": true
+    },
+    {
+      "name": "strongest term wins",
+      "liability_cap": "2x fees",
+      "auto_renew": false,
+      "termination_for_convenience": true,
+      "expected_level": 2,
+      "expected_legal": true
+    },
+    {
+      "name": "missing cap treated as standard",
+      "liability_cap": null,
+      "auto_renew": true,
+      "termination_for_convenience": false,
+      "expected_level": 0,
+      "expected_legal": false
+    }
+  ],
+  "contract_status": [
+    {
+      "from": "Draft",
+      "to": "In Negotiation",
+      "allowed": true
+    },
+    {
+      "from": "In Negotiation",
+      "to": "Signed",
+      "allowed": true
+    },
+    {
+      "from": "In Negotiation",
+      "to": "Draft",
+      "allowed": true
+    },
+    {
+      "from": "Signed",
+      "to": "Active",
+      "allowed": true
+    },
+    {
+      "from": "Active",
+      "to": "Expiring",
+      "allowed": true
+    },
+    {
+      "from": "Active",
+      "to": "Terminated",
+      "allowed": true
+    },
+    {
+      "from": "Expiring",
+      "to": "Renewed",
+      "allowed": true
+    },
+    {
+      "from": "Expiring",
+      "to": "Expired",
+      "allowed": true
+    },
+    {
+      "from": "Expiring",
+      "to": "Terminated",
+      "allowed": true
+    },
+    {
+      "from": "Draft",
+      "to": "Signed",
+      "allowed": false
+    },
+    {
+      "from": "Draft",
+      "to": "Active",
+      "allowed": false
+    },
+    {
+      "from": "Signed",
+      "to": "Draft",
+      "allowed": false
+    },
+    {
+      "from": "Active",
+      "to": "Renewed",
+      "allowed": false
+    },
+    {
+      "from": "Expired",
+      "to": "Active",
+      "allowed": false
+    },
+    {
+      "from": "Terminated",
+      "to": "Active",
+      "allowed": false
+    },
+    {
+      "from": "Renewed",
+      "to": "Expiring",
+      "allowed": false
+    }
+  ],
+  "renewal_notice": [
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "before the prep window",
+      "as_of": "2027-09-01",
+      "auto_renew": true,
+      "renewal_quoted": false,
+      "expected_action": "none",
+      "expected_expiring": false
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "prep window opens (notice date − 30 days), auto-renew",
+      "as_of": "2027-10-02",
+      "auto_renew": true,
+      "renewal_quoted": false,
+      "expected_action": "create_renewal_quote",
+      "expected_expiring": true
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "day before prep window",
+      "as_of": "2027-10-01",
+      "auto_renew": true,
+      "renewal_quoted": false,
+      "expected_action": "none",
+      "expected_expiring": false
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "in window, no auto-renew → owner decides",
+      "as_of": "2027-10-15",
+      "auto_renew": false,
+      "renewal_quoted": false,
+      "expected_action": "notify_owner",
+      "expected_expiring": true
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "in window, renewal already quoted",
+      "as_of": "2027-10-15",
+      "auto_renew": true,
+      "renewal_quoted": true,
+      "expected_action": "none",
+      "expected_expiring": true
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "last day of term, no auto-renew",
+      "as_of": "2027-12-31",
+      "auto_renew": false,
+      "renewal_quoted": false,
+      "expected_action": "notify_owner",
+      "expected_expiring": true
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "after end, no auto-renew → expire",
+      "as_of": "2028-01-01",
+      "auto_renew": false,
+      "renewal_quoted": false,
+      "expected_action": "expire",
+      "expected_expiring": false
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "after end, auto-renew never quoted → quote late",
+      "as_of": "2028-01-01",
+      "auto_renew": true,
+      "renewal_quoted": false,
+      "expected_action": "create_renewal_quote",
+      "expected_expiring": false
+    },
+    {
+      "end_date": "2027-12-31",
+      "notice_days": 60,
+      "name": "after end, auto-renew quoted → renewal order handles it",
+      "as_of": "2028-01-05",
+      "auto_renew": true,
+      "renewal_quoted": true,
+      "expected_action": "none",
+      "expected_expiring": false
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Written by the QCP on every calculation: 0 rep, 1 Deal Desk, 2 Finance, 3 CFO.</description>
+    <fullName>Approval_Level__c</fullName>
+    <label>Approval Level</label>
+    <precision>1</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+</CustomField>

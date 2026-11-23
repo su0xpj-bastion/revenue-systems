@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <defaultValue>false</defaultValue>
+    <description>Set by the QCP when contract terms are non-standard; an Advanced Approvals rule routes to Legal.</description>
+    <fullName>Legal_Review_Required__c</fullName>
+    <label>Legal Review Required</label>
+    <type>Checkbox</type>
+</CustomField>

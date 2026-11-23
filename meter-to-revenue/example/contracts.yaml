@@ -1,0 +1,38 @@
+customers:
+  - {id: C-ACME, name: Acme Corp, jurisdiction: US-NY}
+  - {id: C-GLOBEX, name: Globex, jurisdiction: US-TX}
+  - {id: C-INITECH, name: Initech, jurisdiction: US-OR}
+  - {id: C-UMBRELLA, name: Umbrella Health, jurisdiction: US-NY, exemption_certificate: EX-2027-0042}
+
+contracts:
+  - id: K-ACME                 # annual seats in advance + pay-as-you-go API
+    customer: C-ACME
+    start: 2027-03-01
+    end: 2028-03-01
+    lines:
+      - {product: SEATS, quantity: 20, billing: annual}
+      - {product: API}
+
+  - id: K-GLOBEX               # prepaid commit drawn down by API; runs out in April → overage
+    customer: C-GLOBEX
+    start: 2027-03-01
+    end: 2027-05-01
+    commit: {amount: 5000, applies_to: [API]}
+    lines:
+      - {product: API}
+      - {product: SUPPORT}
+
+  - id: K-INITECH              # prepaid commit mostly unused → breakage at contract end
+    customer: C-INITECH
+    start: 2027-03-01
+    end: 2027-05-01
+    commit: {amount: 1000, applies_to: [API]}
+    lines:
+      - {product: API}
+
+  - id: K-UMBRELLA             # monthly seats, tax-exempt customer
+    customer: C-UMBRELLA
+    start: 2027-03-01
+    end: 2028-03-01
+    lines:
+      - {product: SEATS, quantity: 10, billing: monthly}

@@ -1,0 +1,7 @@
+quote_id,account,quote_date,opportunity_type,status,sku,first_period_amount
+Q-1001,ACME,2027-03-02,New Business,Accepted,INS-TEAM,3060.00
+Q-1002,HOOLI,2027-03-03,New Business,Accepted,INS-ENT,60000.00
+Q-1003,STARK,2027-03-04,New Business,Accepted,INS-SUPPORT-PREM,6000.00
+Q-1004,WAYNE,2027-03-05,New Business,Accepted,INS-TEAM,1800.00
+Q-1005,UMBRELLA,2027-03-06,New Business,Draft,LEGACY-ANALYTICS,3000.00
+Q-1006,ACME,2027-03-07,Existing Customer - Renewal,Accepted,LEGACY-ANALYTICS,6000.00

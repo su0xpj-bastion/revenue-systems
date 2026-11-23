@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Kind__c</fullName>
+    <label>Kind</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Missing_In_Billing</fullName>
+                <default>false</default>
+                <label>Missing In Billing</label>
+            </value>
+            <value>
+                <fullName>Missing_In_Salesforce</fullName>
+                <default>false</default>
+                <label>Missing In Salesforce</label>
+            </value>
+            <value>
+                <fullName>Quantity_Mismatch</fullName>
+                <default>false</default>
+                <label>Quantity Mismatch</label>
+            </value>
+            <value>
+                <fullName>Price_Mismatch</fullName>
+                <default>false</default>
+                <label>Price Mismatch</label>
+            </value>
+            <value>
+                <fullName>Status_Mismatch</fullName>
+                <default>false</default>
+                <label>Status Mismatch</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

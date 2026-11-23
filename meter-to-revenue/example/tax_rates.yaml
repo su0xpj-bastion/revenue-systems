@@ -1,0 +1,6 @@
+# Illustrative rates by jurisdiction and product tax code. Not tax advice; a real deployment
+# calls a tax engine (Avalara, Anrok, Stripe Tax) behind the same interface.
+rates:
+  US-NY: {SAAS: 0.08875, SERVICES: 0.08875}
+  US-TX: {SAAS: 0.0625, SERVICES: 0.0625}
+  US-OR: {SAAS: 0, SERVICES: 0}

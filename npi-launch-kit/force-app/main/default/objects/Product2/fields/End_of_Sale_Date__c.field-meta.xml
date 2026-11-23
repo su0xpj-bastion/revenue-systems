@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>End_of_Sale_Date__c</fullName>
+    <description>No new business on this product from this date. Renewals follow the retirement plan.</description>
+    <label>End of Sale Date</label>
+    <required>false</required>
+    <type>Date</type>
+</CustomField>

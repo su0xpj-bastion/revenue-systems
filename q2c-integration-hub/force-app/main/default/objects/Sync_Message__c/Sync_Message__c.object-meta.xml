@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <enableHistory>true</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <label>Sync Message</label>
+    <nameField>
+        <displayFormat>SM-{00000000}</displayFormat>
+        <label>Sync Message Number</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Sync Messages</pluralLabel>
+    <sharingModel>ReadWrite</sharingModel>
+</CustomObject>

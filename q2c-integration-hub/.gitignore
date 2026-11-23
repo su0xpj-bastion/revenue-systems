@@ -1,0 +1,9 @@
+node_modules/
+build/
+.sf/
+.sfdx/
+*.key
+.env
+.venv/
+__pycache__/
+coverage/

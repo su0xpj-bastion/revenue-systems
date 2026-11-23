@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "q2c.clm-event.v1",
+  "title": "CLM webhook event (POST /services/apexrest/q2c/clm/v1/events)",
+  "description": "Signed with X-CLM-Timestamp + X-CLM-Signature (HMAC-SHA256 of timestamp.body). eventId is unique per event and is the dedupe key. agreementVersion increases with every agreement change and orders out-of-order deliveries. Unknown types are accepted and ignored.",
+  "type": "object",
+  "required": ["eventId", "type", "externalReference", "agreementVersion"],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "type": { "type": "string" },
+    "externalReference": { "type": "string", "pattern": "^[a-zA-Z0-9]{15,18}$" },
+    "agreementId": { "type": "string" },
+    "agreementVersion": { "type": "integer", "minimum": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  }
+}

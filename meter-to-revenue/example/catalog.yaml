@@ -1,0 +1,23 @@
+# Fictional catalog. Amounts in USD.
+products:
+  - code: SEATS
+    name: Platform Seats
+    kind: seat
+    unit_price: 30.00          # per seat per month
+    tax_code: SAAS
+  - code: SUPPORT
+    name: Premium Support
+    kind: flat
+    unit_price: 500.00         # per month
+    tax_code: SERVICES
+  - code: API
+    name: API Usage
+    kind: usage
+    meter: api_tokens
+    unit: M tokens
+    tier_mode: graduated
+    tiers:
+      - {up_to: 100, unit_price: 3.00}
+      - {up_to: 1000, unit_price: 2.50}
+      - {up_to: null, unit_price: 2.00}
+    tax_code: SAAS

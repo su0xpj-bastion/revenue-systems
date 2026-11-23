@@ -1,0 +1,21 @@
+# Launch tracker: which readiness items are done and who has signed off.
+done:
+  - spec:frozen
+  - catalog:INS-TEAM
+  - catalog:INS-API
+  - catalog:INS-ENT
+  - catalog:INS-SUPPORT-PREM
+  - tiers:INS-API
+  - bundle:INS-STARTER
+  - tax:INS-TEAM
+  - tax:INS-API
+  - billing:INS-TEAM
+  - billing:INS-SUPPORT-PREM
+  - approvals:rules
+  - migration:LEGACY-ANALYTICS
+
+signoffs:
+  product: {by: Product Lead, date: 2027-01-20}
+  pricing: {by: Pricing Lead, date: 2027-01-20}
+  deal_desk: {by: Deal Desk Manager, date: 2027-02-10}
+  tax: {by: Tax Manager, date: 2027-02-12}

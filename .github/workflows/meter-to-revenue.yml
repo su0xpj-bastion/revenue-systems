@@ -1,0 +1,45 @@
+name: meter-to-revenue
+
+on:
+  pull_request:
+    paths: ["meter-to-revenue/**", ".github/workflows/meter-to-revenue.yml"]
+  push:
+    paths: ["meter-to-revenue/**", ".github/workflows/meter-to-revenue.yml"]
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: meter-to-revenue
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  close-the-books:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Run two billing periods with controls (April failures are planted)
+        run: python -m m2r demo example --out out | tee out.txt
+      - name: Evidence to job summary
+        run: |
+          for p in 2027-03 2027-04; do cat "out/$p/evidence.md" >> "$GITHUB_STEP_SUMMARY"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-packs
+          path: meter-to-revenue/out/

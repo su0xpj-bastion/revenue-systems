@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit(gtm-release-control/force-app/**)",
+      "Edit(gtm-release-control/apps/**)",
+      "Edit(gtm-release-control/docs/**)",
+      "Edit(gtm-release-control/tests/**)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git switch:*)",
+      "Bash(git checkout -b:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push origin agent/:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue comment:*)",
+      "Bash(gh pr create:*)",
+      "Bash(python -m pytest:*)"
+    ],
+    "deny": [
+      "Edit(.github/**)",
+      "Edit(gtm-release-control/classifier/**)",
+      "Edit(gtm-release-control/gate/**)",
+      "Edit(gtm-release-control/evidence/**)",
+      "Edit(gtm-release-control/agents/**)",
+      "Edit(gtm-release-control/infra/**)",
+      "Edit(CODEOWNERS)",
+      "Edit(**/profiles/**)",
+      "Edit(**/permissionsets/**)",
+      "Edit(**/sharingRules/**)",
+      "Edit(**/destructiveChanges*.xml)",
+      "Read(.env)",
+      "Read(**/*.key)",
+      "Bash(sf:*)",
+      "Bash(sfdx:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push origin main:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh label:*)",
+      "Bash(gh workflow:*)",
+      "Bash(gh secret:*)",
+      "Bash(gh variable:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "WebFetch"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+# Pipeline controls: platform owners must review any change.
+/.github/        @gtm-systems/platform-owners
+/gtm-release-control/classifier/     @gtm-systems/platform-owners
+/gtm-release-control/gate/           @gtm-systems/platform-owners
+/gtm-release-control/evidence/       @gtm-systems/platform-owners
+/gtm-release-control/agents/         @gtm-systems/platform-owners
+/gtm-release-control/infra/          @gtm-systems/platform-owners
+/CODEOWNERS      @gtm-systems/platform-owners
+
+# Salesforce security model
+/gtm-release-control/force-app/**/profiles/        @gtm-systems/salesforce-security
+/gtm-release-control/force-app/**/permissionsets/  @gtm-systems/salesforce-security
+/gtm-release-control/force-app/**/sharingRules/    @gtm-systems/salesforce-security
+
+# Deliberately no catch-all owner on /gtm-release-control/force-app/: review requirements for everything else
+# come from the lane (lane-gate), so agentic changes are not forced through a human.

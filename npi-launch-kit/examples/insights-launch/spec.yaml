@@ -1,0 +1,81 @@
+# Example launch for a fictional company. Prices, SKUs and tax codes are illustrative.
+launch:
+  code: INS-2027-03
+  name: Insights Platform GA
+  launch_date: 2027-03-01
+  first_bill_run: 2027-04-01
+  currency: USD
+
+products:
+  - sku: INS-TEAM
+    name: Insights Team
+    family: Insights
+    model: per_seat
+    list_price: 30.00          # per seat per month
+    min_quantity: 5
+    billing_frequency: annual  # billed annually in advance
+    term_months: 12
+    tax_code: TX-SAAS-01
+    revenue: ratable
+
+  - sku: INS-API
+    name: Insights API (pay as you go)
+    family: Insights
+    model: usage_tiered
+    unit: 1M tokens
+    usage_source: metering-service   # system of record for quantities
+    tier_mode: graduated
+    tiers:
+      - {up_to: 100, price: 3.00}
+      - {up_to: 1000, price: 2.50}
+      - {up_to: null, price: 2.00}
+    billing_frequency: monthly       # in arrears
+    term_months: 12
+    tax_code: TX-SAAS-01
+    revenue: usage
+
+  - sku: INS-ENT
+    name: Insights Enterprise Commit
+    family: Insights
+    model: committed
+    usage_sku: INS-API
+    ramp:
+      - {year: 1, commit: 60000}
+      - {year: 2, commit: 90000}
+      - {year: 3, commit: 120000}
+    drawdown_rate: 2.00     # per 1M tokens drawn from the commit
+    overage_rate: 2.25      # per 1M tokens after the commit is used
+    billing_frequency: annual
+    term_months: 36
+    tax_code: TX-SAAS-01
+    revenue: usage
+
+  - sku: INS-SUPPORT-PREM
+    name: Premium Support
+    family: Services
+    model: flat
+    list_price: 500.00      # per month
+    billing_frequency: annual
+    term_months: 12
+    tax_code: TX-SVC-02
+    revenue: ratable
+
+bundles:
+  - sku: INS-STARTER
+    name: Insights Starter Bundle
+    required: [INS-TEAM]
+    optional: [INS-SUPPORT-PREM]
+
+approvals:                  # max line discount → approver
+  - {max_discount_pct: 10, approver: auto}
+  - {max_discount_pct: 20, approver: deal_desk}
+  - {max_discount_pct: 35, approver: finance}
+
+retirements:
+  - sku: LEGACY-ANALYTICS
+    replacement: INS-TEAM
+    end_of_sale: 2027-03-01
+    end_of_renewal: 2028-02-29
+    policy: migrate_at_renewal
+
+signoffs: [product, pricing, deal_desk, sales, finance, accounting, tax, legal, billing_eng]

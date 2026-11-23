@@ -1,0 +1,3 @@
+ProductCode,Name,UnitPrice,Tax_Code__c,IsActive
+LEGACY-ANALYTICS,Analytics Classic,25.00,TX-SAAS-01,true
+INS-SUPPORT-PREM,Premium Support,450.00,TX-SVC-02,true

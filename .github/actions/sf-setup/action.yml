@@ -1,0 +1,58 @@
+name: sf-setup
+description: Install the Salesforce CLI + sfdx-git-delta and log in to one org with JWT (no stored passwords).
+inputs:
+  client-id:
+    description: Connected app consumer key for this org's CI integration user
+    required: true
+  jwt-key:
+    description: PEM private key for the connected app certificate
+    required: true
+  username:
+    description: CI integration username for this org
+    required: true
+  alias:
+    description: Local alias for the org
+    required: true
+  instance-url:
+    description: Login URL (https://login.salesforce.com or https://test.salesforce.com)
+    default: https://login.salesforce.com
+  dev-hub:
+    description: Set this org as the default Dev Hub
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install Salesforce CLI and plugins
+      shell: bash
+      run: |
+        npm install --global @salesforce/cli
+        echo y | sf plugins install sfdx-git-delta
+        sf version
+
+    - name: JWT login
+      shell: bash
+      env:
+        SF_CLIENT_ID: ${{ inputs.client-id }}
+        SF_JWT_KEY: ${{ inputs.jwt-key }}
+        SF_USERNAME: ${{ inputs.username }}
+        SF_ALIAS: ${{ inputs.alias }}
+        SF_INSTANCE_URL: ${{ inputs.instance-url }}
+        SF_DEV_HUB: ${{ inputs.dev-hub }}
+      run: |
+        set -euo pipefail
+        key_file="$(mktemp)"
+        trap 'rm -f "$key_file"' EXIT
+        printf '%s' "$SF_JWT_KEY" > "$key_file"
+        extra=()
+        if [ "$SF_DEV_HUB" = "true" ]; then extra+=(--set-default-dev-hub); fi
+        sf org login jwt \
+          --client-id "$SF_CLIENT_ID" \
+          --jwt-key-file "$key_file" \
+          --username "$SF_USERNAME" \
+          --instance-url "$SF_INSTANCE_URL" \
+          --alias "$SF_ALIAS" \
+          "${extra[@]}"

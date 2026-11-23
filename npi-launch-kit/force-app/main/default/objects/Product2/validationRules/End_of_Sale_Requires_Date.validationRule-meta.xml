@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>End_of_Sale_Requires_Date</fullName>
+    <active>true</active>
+    <description>Retiring a product needs a date so quoting, renewals and reporting can all key off it.</description>
+    <errorConditionFormula>AND(
+    OR(ISPICKVAL(Launch_Stage__c, &quot;End of Sale&quot;), ISPICKVAL(Launch_Stage__c, &quot;Retired&quot;)),
+    ISBLANK(End_of_Sale_Date__c)
+)</errorConditionFormula>
+    <errorDisplayField>End_of_Sale_Date__c</errorDisplayField>
+    <errorMessage>Set an End of Sale Date before moving a product to End of Sale or Retired.</errorMessage>
+</ValidationRule>

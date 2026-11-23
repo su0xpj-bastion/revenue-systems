@@ -1,0 +1,3 @@
+{"event_id": "evt-0101", "customer": "C-GLOBEX", "meter": "api_tokens", "quantity": 1000, "timestamp": "2027-04-12T10:00:00Z"}
+{"event_id": "evt-0102", "customer": "C-ACME", "meter": "api_tokens", "quantity": 30, "timestamp": "2027-04-08T10:00:00Z"}
+{"event_id": "evt-0099", "customer": "C-ACME", "meter": "api_tokens", "quantity": 20, "timestamp": "2027-03-30T23:50:00Z"}

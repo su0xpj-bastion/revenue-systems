@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Idempotency_Key__c</fullName>
+    <label>Idempotency Key</label>
+    <length>255</length>
+    <required>true</required>
+    <externalId>true</externalId>
+    <unique>true</unique>
+    <caseSensitive>true</caseSensitive>
+    <description>Outbound: target:operation:recordId:vN. Inbound: source:eventId. Unique, so a duplicate insert fails instead of creating a second message.</description>
+    <type>Text</type>
+</CustomField>

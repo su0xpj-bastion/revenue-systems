@@ -1,0 +1,84 @@
+name: q2c-integration-hub
+
+on:
+  pull_request:
+    paths: ["q2c-integration-hub/**", ".github/workflows/q2c-integration-hub.yml"]
+  push:
+    paths: ["q2c-integration-hub/**", ".github/workflows/q2c-integration-hub.yml"]
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: q2c-integration-hub
+permissions:
+  contents: read
+
+concurrency:
+  group: q2c-integration-hub-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  salesforce-static:
+    name: Apex syntax, metadata, vectors, LWC Jest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: q2c-integration-hub/package-lock.json
+      - run: npm ci
+      - name: Apex syntax (every class and trigger)
+        run: npm run apex:syntax
+      - name: Metadata well-formed + every custom name in code exists
+        run: npm run metadata:check
+      - name: Shared vectors identical in both runtimes
+        run: npm run vectors:check
+      - name: LWC Jest
+        run: npx sfdx-lwc-jest --coverage
+
+  simulator:
+    name: Python reference model + chaos invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: q2c-integration-hub/sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - name: Unit + chaos tests (vectors, invariants, data contracts)
+        run: python -m unittest discover -s tests -t . -v
+      - name: 500 seeded chaos scenarios
+        run: python -m q2c_sim 500
+
+  # Runs once an org is connected: set repo variable SF_ORG_ENABLED=true and the SF_* secrets
+  # (any Developer Edition org with JWT login). Check-only deploy + all local Apex tests.
+  apex-org-tests:
+    needs: [salesforce-static, simulator]
+    if: vars.SF_ORG_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --global @salesforce/cli
+      - name: Login (JWT)
+        env:
+          SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
+        run: |
+          key="$(mktemp)"; printf '%s' "$SF_JWT_KEY" > "$key"
+          sf org login jwt --client-id "${{ secrets.SF_CLIENT_ID }}" --jwt-key-file "$key" \
+            --username "${{ secrets.SF_USERNAME }}" --alias ci
+          rm -f "$key"
+      - name: Validate deploy and run local tests (75% coverage gate enforced by the platform)
+        run: |
+          sf project deploy validate --source-dir force-app --target-org ci \
+            --test-level RunLocalTests --coverage-formatters text --wait 30

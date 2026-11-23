@@ -1,0 +1,10 @@
+{
+  "packageDirectories": [
+    { "path": "force-app-core", "default": true },
+    { "path": "force-app-cpq" }
+  ],
+  "name": "cpq-q2c-extensions",
+  "namespace": "",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sourceApiVersion": "62.0"
+}

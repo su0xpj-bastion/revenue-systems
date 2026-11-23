@@ -1,0 +1,59 @@
+name: cpq-q2c-extensions
+
+on:
+  pull_request:
+    paths: ["cpq-q2c-extensions/**", ".github/workflows/cpq-q2c-extensions.yml"]
+  push:
+    paths: ["cpq-q2c-extensions/**", ".github/workflows/cpq-q2c-extensions.yml"]
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: cpq-q2c-extensions
+permissions:
+  contents: read
+
+jobs:
+  qcp-and-apex-syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci || npm install
+      - name: QCP tests (shared vectors + CPQ-shaped models)
+        run: npm test
+      - name: Apex syntax (all classes and triggers)
+        run: npm run apex:syntax
+      - name: Vectors in sync with Apex static resource
+        run: npm run vectors:check
+      - name: Build QCP record
+        run: npm run qcp:record
+
+  # Runs only once an org is connected: set repo variable SF_CORE_ORG_ENABLED=true and the
+  # SF_CORE_* secrets (any org, e.g. a Developer Edition, with JWT login).
+  apex-core-tests:
+    needs: qcp-and-apex-syntax
+    if: vars.SF_CORE_ORG_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --global @salesforce/cli
+      - name: Login (JWT)
+        env:
+          SF_JWT_KEY: ${{ secrets.SF_CORE_JWT_KEY }}
+        run: |
+          key="$(mktemp)"; printf '%s' "$SF_JWT_KEY" > "$key"
+          sf org login jwt --client-id "${{ secrets.SF_CORE_CLIENT_ID }}" --jwt-key-file "$key" \
+            --username "${{ secrets.SF_CORE_USERNAME }}" --alias core
+          rm -f "$key"
+      - name: Deploy core and run vector tests (check-only)
+        run: |
+          sf project deploy validate --source-dir force-app-core --target-org core \
+            --test-level RunSpecifiedTests --tests PricingVectorsTest --wait 30

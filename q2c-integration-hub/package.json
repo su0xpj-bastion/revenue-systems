@@ -1,0 +1,16 @@
+{
+  "name": "q2c-integration-hub",
+  "private": true,
+  "scripts": {
+    "apex:syntax": "node scripts/apex-syntax-check.mjs",
+    "metadata:check": "node scripts/metadata-check.mjs",
+    "vectors:check": "node scripts/check-vectors-sync.mjs",
+    "test:lwc": "sfdx-lwc-jest",
+    "check": "npm run apex:syntax && npm run metadata:check && npm run vectors:check && npm run test:lwc"
+  },
+  "devDependencies": {
+    "@apexdevtools/apex-parser": "5.3.0",
+    "@salesforce/sfdx-lwc-jest": "7.0.1",
+    "fast-xml-parser": "4.5.0"
+  }
+}

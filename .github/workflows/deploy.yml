@@ -1,0 +1,254 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write        # push to the evidence-ledger branch
+  pull-requests: write   # rollback.yml (called below) opens a revert PR; callees cannot exceed caller
+  issues: write
+  actions: read
+
+# One production change at a time, never cancelled midway.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: gtm-release-control
+
+jobs:
+  resolve:
+    # Off until a production org is connected (set repo variable SF_DEPLOY_ENABLED=true).
+    if: vars.SF_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      pr: ${{ steps.pr.outputs.number }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      opened_at: ${{ steps.pr.outputs.opened_at }}
+      lane: ${{ steps.lane.outputs.lane }}
+    steps:
+      - name: Find the merged PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr_json=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0]')
+          if [ -z "$pr_json" ] || [ "$pr_json" = "null" ]; then
+            echo "::error::$GITHUB_SHA has no PR. Direct pushes to main are not deployable."
+            exit 1
+          fi
+          {
+            echo "number=$(jq -r .number <<<"$pr_json")"
+            echo "head_sha=$(jq -r .head.sha <<<"$pr_json")"
+            echo "opened_at=$(jq -r .created_at <<<"$pr_json")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve lane
+        id: lane
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          lane=$(gh pr view "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --json labels \
+            --jq '[.labels[].name | select(startswith("lane:"))][0] // "" | ltrimstr("lane:")')
+          if [ -z "$lane" ]; then
+            echo "::error::merged PR has no lane label"
+            exit 1
+          fi
+          echo "lane=$lane" >> "$GITHUB_OUTPUT"
+
+      # Kill-switch: any open issue labeled deploy-freeze stops every production deploy.
+      # Anyone on the team can pull it; closing it is a deliberate, logged act.
+      - name: Kill-switch check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --label deploy-freeze --state open \
+            --json number --jq 'length')
+          if [ "$open" != "0" ]; then
+            echo "::error::Deploys are frozen ($open open deploy-freeze issue(s))."
+            exit 1
+          fi
+
+  deploy:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # human_in_loop deploys wait for a release approver on the gated environment (change window).
+    environment: ${{ needs.resolve.outputs.lane == 'human_in_loop' && 'production-gated' || 'production' }}
+    outputs:
+      deployed: ${{ steps.deploy.outputs.deployed }}
+      deploy_id: ${{ steps.deploy.outputs.deploy_id }}
+      method: ${{ steps.deploy.outputs.method }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/sf-setup
+        with:
+          client-id: ${{ secrets.SF_PROD_CLIENT_ID }}
+          jwt-key: ${{ secrets.SF_PROD_JWT_KEY }}
+          username: ${{ secrets.SF_PROD_USERNAME }}
+          alias: prod
+
+      - name: Fetch validated deploy from the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow validate-sf.yml \
+            --commit "${{ needs.resolve.outputs.head_sha }}" --status success --limit 1 \
+            --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" -n validated-deploy -D validated || true
+          fi
+
+      - name: Deploy
+        id: deploy
+        run: |
+          set -euo pipefail
+          job_id=""
+          if [ -f validated/validated-deploy.json ]; then
+            job_id=$(jq -r '.result.id // empty' validated/validated-deploy.json)
+          fi
+
+          if [ -n "$job_id" ] && sf project deploy quick --job-id "$job_id" --target-org prod \
+               --wait 60 --json > deploy.json; then
+            echo "method=quick-deploy" >> "$GITHUB_OUTPUT"
+          else
+            # No validated ID, or it expired / was invalidated by another deploy: full delta deploy.
+            mkdir -p .delta
+            sf sgd source delta --from "${{ github.event.before }}" --to "$GITHUB_SHA" \
+              --output-dir .delta --generate-delta
+            if ! grep -q "<types>" .delta/package/package.xml \
+               && ! grep -q "<types>" .delta/destructiveChanges/destructiveChanges.xml; then
+              echo '{"result": {"id": "none"}, "skipped": "no deployable metadata"}' > deploy.json
+              echo "method=no-op" >> "$GITHUB_OUTPUT"
+            else
+              sf project deploy start \
+                --manifest .delta/package/package.xml \
+                --post-destructive-changes .delta/destructiveChanges/destructiveChanges.xml \
+                --target-org prod --test-level RunLocalTests \
+                --wait 60 --json > deploy.json
+              echo "method=delta-deploy" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          # Salesforce deploys are atomic: if we got here, the change is live.
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+          echo "deploy_id=$(jq -r '.result.id // "none"' deploy.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Post-deploy smoke tests
+        run: |
+          sf apex run test --target-org prod \
+            --class-names "${{ vars.SMOKE_TEST_CLASSES || 'OpportunityTriggerHandlerTest' }}" \
+            --code-coverage --wait 20 --json > smoke.json || true
+          python ci/coverage_gate.py smoke.json --min-coverage 0
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-results
+          path: |
+            gtm-release-control/deploy.json
+            gtm-release-control/smoke.json
+          retention-days: 90
+
+  # Metadata deployed but smoke tests failed: restore the previous main state automatically.
+  rollback:
+    needs: [resolve, deploy]
+    if: failure() && needs.deploy.outputs.deployed == 'true'
+    uses: ./.github/workflows/rollback.yml
+    with:
+      good_sha: ${{ github.event.before }}
+      bad_sha: ${{ github.sha }}
+      reason: post-deploy smoke tests failed
+    secrets: inherit
+
+  evidence:
+    needs: [resolve, deploy, rollback]
+    if: always() && needs.resolve.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect PR evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
+        run: |
+          mkdir -p pack
+          for wf in classify gate; do
+            run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf.yml" --commit "$HEAD_SHA" \
+              --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            if [ -n "$run_id" ]; then gh run download "$run_id" --repo "$GITHUB_REPOSITORY" -D "pack/$wf" || true; fi
+          done
+          gh pr view "${{ needs.resolve.outputs.pr }}" --repo "$GITHUB_REPOSITORY" \
+            --json number,title,author,url,mergedBy,mergedAt,reviews,labels > pack/pr.json
+
+      - name: Collect deploy results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: deploy-results
+          path: gtm-release-control/pack/deploy
+
+      - name: Build ledger entry
+        env:
+          PR: ${{ needs.resolve.outputs.pr }}
+          LANE: ${{ needs.resolve.outputs.lane }}
+          OPENED_AT: ${{ needs.resolve.outputs.opened_at }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          DEPLOY_ID: ${{ needs.deploy.outputs.deploy_id }}
+          METHOD: ${{ needs.deploy.outputs.method }}
+          ROLLBACK_RESULT: ${{ needs.rollback.result }}
+        run: |
+          python - <<'EOF'
+          import glob, json, os
+          classification = {}
+          for path in glob.glob("pack/classify/**/classification.json", recursive=True):
+              classification = json.load(open(path))
+          pr = json.load(open("pack/pr.json"))
+          entry = {
+              "sha": os.environ["GITHUB_SHA"],
+              "pr": int(os.environ["PR"]),
+              "pr_url": pr["url"],
+              "pr_opened_at": os.environ["OPENED_AT"],
+              "author": pr["author"]["login"],
+              "merged_by": (pr.get("mergedBy") or {}).get("login"),
+              "approvers": sorted({r["author"]["login"] for r in pr["reviews"] if r["state"] == "APPROVED"}),
+              "labels": [l["name"] for l in pr["labels"]],
+              "lane": os.environ["LANE"],
+              "classification_reasons": classification.get("reasons", []),
+              "llm_rationale": classification.get("rationale", ""),
+              "deploy_result": os.environ["DEPLOY_RESULT"],
+              "deploy_id": os.environ.get("DEPLOY_ID") or None,
+              "deploy_method": os.environ.get("METHOD") or None,
+              "rollback_result": os.environ["ROLLBACK_RESULT"],
+              "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
+          json.dump(entry, open("pack/ledger-entry.json", "w"), indent=2)
+          EOF
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: ./.github/actions/ledger-append
+        with:
+          event: deploy
+          data-file: pack/ledger-entry.json
+          token: ${{ github.token }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-pack-${{ github.sha }}
+          path: gtm-release-control/pack/
+          retention-days: 90

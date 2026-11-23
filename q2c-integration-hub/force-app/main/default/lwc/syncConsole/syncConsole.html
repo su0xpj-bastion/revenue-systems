@@ -1,0 +1,37 @@
+<template>
+    <lightning-card title="Q2C Sync" icon-name="standard:data_integration_hub">
+        <lightning-button-icon slot="actions" icon-name="utility:refresh" alternative-text="Refresh" onclick={handleRefresh}></lightning-button-icon>
+        <div class="slds-p-horizontal_medium">
+            <template lwc:if={error}>
+                <p class="slds-text-color_error" data-id="error">{error}</p>
+            </template>
+            <template lwc:if={summary}>
+                <p class={headlineClass} data-id="headline">{headline}</p>
+                <template lwc:if={stuckCount}>
+                    <p class="slds-text-color_error slds-m-top_x-small" data-id="stuck">{stuckCount} message(s) need attention.</p>
+                </template>
+                <template lwc:if={busy}>
+                    <lightning-spinner alternative-text="Working" size="small"></lightning-spinner>
+                </template>
+
+                <h3 class="slds-text-heading_small slds-m-top_medium">Outbox and inbox</h3>
+                <template lwc:if={hasMessages}>
+                    <lightning-datatable key-field="Id" data={messages} columns={messageColumns}
+                        hide-checkbox-column onrowaction={handleMessageAction} data-id="messages"></lightning-datatable>
+                </template>
+                <template lwc:else>
+                    <p class="slds-text-color_weak">No sync messages yet.</p>
+                </template>
+
+                <h3 class="slds-text-heading_small slds-m-top_medium">Open reconciliation breaks</h3>
+                <template lwc:if={hasBreaks}>
+                    <lightning-datatable key-field="Id" data={breaks} columns={breakColumns}
+                        hide-checkbox-column onrowaction={handleBreakAction} data-id="breaks"></lightning-datatable>
+                </template>
+                <template lwc:else>
+                    <p class="slds-text-color_weak" data-id="no-breaks">Billing matches Salesforce.</p>
+                </template>
+            </template>
+        </div>
+    </lightning-card>
+</template>

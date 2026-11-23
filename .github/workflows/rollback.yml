@@ -1,0 +1,136 @@
+name: rollback
+
+# Restores production metadata to a known-good commit, freezes deploys, and opens a revert PR.
+# Pre-approved standard change: no reviewer wait, because speed is the control here.
+# What it cannot undo: data written while the bad version was live, and some destructive
+# metadata changes (e.g. deleted fields lose their data). See docs/DESIGN.md.
+
+on:
+  workflow_call:
+    inputs:
+      good_sha: { type: string, required: true }
+      bad_sha: { type: string, required: true }
+      reason: { type: string, required: true }
+  workflow_dispatch:
+    inputs:
+      good_sha: { description: Last known-good commit on main, required: true }
+      bad_sha: { description: Commit currently live in production, required: true }
+      reason: { description: Why, required: true }
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+defaults:
+  run:
+    working-directory: gtm-release-control
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production-rollback
+    concurrency:
+      group: production-rollback
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.good_sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/sf-setup
+        with:
+          client-id: ${{ secrets.SF_PROD_CLIENT_ID }}
+          jwt-key: ${{ secrets.SF_PROD_JWT_KEY }}
+          username: ${{ secrets.SF_PROD_USERNAME }}
+          alias: prod
+
+      # Freeze first: nothing else ships while production is being restored.
+      - name: Freeze deploys
+        run: |
+          gh label create deploy-freeze --repo "$GITHUB_REPOSITORY" --color B60205 --force >/dev/null
+          gh issue create --repo "$GITHUB_REPOSITORY" --label deploy-freeze \
+            --title "Deploy freeze: production rollback of ${BAD_SHA::7}" \
+            --body "Rollback started: \`${BAD_SHA}\` → \`${GOOD_SHA}\`. Reason: ${REASON}.
+          Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          Close this issue to unfreeze after the revert PR merges and the incident is reviewed."
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GOOD_SHA: ${{ inputs.good_sha }}
+          BAD_SHA: ${{ inputs.bad_sha }}
+          REASON: ${{ inputs.reason }}
+
+      - name: Build reverse delta (bad → good)
+        run: |
+          mkdir -p .rollback
+          sf sgd source delta --from "${{ inputs.bad_sha }}" --to "${{ inputs.good_sha }}" \
+            --output-dir .rollback --generate-delta
+          cat .rollback/package/package.xml
+          cat .rollback/destructiveChanges/destructiveChanges.xml
+
+      - name: Deploy known-good metadata
+        id: restore
+        run: |
+          sf project deploy start \
+            --manifest .rollback/package/package.xml \
+            --post-destructive-changes .rollback/destructiveChanges/destructiveChanges.xml \
+            --target-org prod --test-level RunLocalTests \
+            --wait 60 --json > rollback-deploy.json
+          echo "deploy_id=$(jq -r '.result.id // "none"' rollback-deploy.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build ledger entry
+        env:
+          GOOD_SHA: ${{ inputs.good_sha }}
+          BAD_SHA: ${{ inputs.bad_sha }}
+          REASON: ${{ inputs.reason }}
+          DEPLOY_ID: ${{ steps.restore.outputs.deploy_id }}
+        run: |
+          python - <<'EOF'
+          import json, os
+          json.dump({
+              "good_sha": os.environ["GOOD_SHA"],
+              "bad_sha": os.environ["BAD_SHA"],
+              "reason": os.environ["REASON"],
+              "deploy_id": os.environ["DEPLOY_ID"],
+              "actor": os.environ["GITHUB_ACTOR"],
+              "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }, open("rollback-entry.json", "w"), indent=2)
+          EOF
+
+      - uses: ./.github/actions/ledger-append
+        with:
+          event: rollback
+          data-file: rollback-entry.json
+          token: ${{ github.token }}
+
+      # main still contains the bad commit; without a revert the next deploy re-ships it.
+      # App token so the revert PR triggers classify/gate like any other change.
+      - name: Revert PR token
+        id: app
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.CLASSIFIER_APP_ID }}
+          private-key: ${{ secrets.CLASSIFIER_APP_KEY }}
+
+      - name: Open revert PR
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GOOD_SHA: ${{ inputs.good_sha }}
+          BAD_SHA: ${{ inputs.bad_sha }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          branch="revert/${BAD_SHA::7}"
+          git fetch origin main
+          git switch -c "$branch" origin/main
+          git -c user.name="gtm-release-control" -c user.email="noreply@github.com" \
+            revert --no-edit "${GOOD_SHA}..${BAD_SHA}"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --title "Revert ${BAD_SHA::7} (production rolled back)" \
+            --body "Production was rolled back to \`${GOOD_SHA}\`. Reason: ${REASON}. Merge this to bring main back in line with production."

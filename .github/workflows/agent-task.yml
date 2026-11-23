@@ -1,0 +1,45 @@
+name: agent-task
+
+# Agentic lane producer: an issue labeled agent:task is handed to Claude Code, which opens a PR.
+# The agent's PR goes through classify + gate like any human PR; "agentic" is a lane the
+# classifier grants, never one the agent picks.
+#
+# Sandbox: this job holds NO Salesforce credentials and cannot deploy anything. The agent's
+# tool permissions come from agents/claude-settings.agent-lane.json on the default branch.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: agent-task-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  agent:
+    if: github.event.label.name == 'agent:task' && vars.AGENT_LANE_ENABLED != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --settings gtm-release-control/agents/claude-settings.agent-lane.json --max-turns 40
+          prompt: |
+            Resolve GitHub issue #${{ github.event.issue.number }} in ${{ github.repository }}.
+            Read the issue with `gh issue view ${{ github.event.issue.number }}`.
+            Work on a new branch named agent/issue-${{ github.event.issue.number }}.
+            Keep the change as small as the issue allows. Add or update Apex tests for any Apex
+            you touch, and keep every test bulk-safe at 200 records.
+            The Salesforce project is in gtm-release-control/; work only there.
+            You cannot edit pipeline files (.github, CODEOWNERS, and gtm-release-control/ classifier, gate, evidence, agents, infra);
+            if the issue needs that, comment on the issue explaining why and stop.
+            When done, open a pull request with `gh pr create` that links the issue and lists
+            what you changed and what you did not verify.

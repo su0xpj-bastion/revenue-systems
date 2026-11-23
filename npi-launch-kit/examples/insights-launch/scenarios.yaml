@@ -1,0 +1,39 @@
+# Quote + billing scenarios agreed with Finance and Deal Desk.
+# Expected values are worked by hand in docs/PRICING_MODELS.md, not copied from the engine.
+scenarios:
+  - name: Team, 10 seats, 15% discount routes to Deal Desk
+    start: 2027-03-01
+    lines: [{sku: INS-TEAM, quantity: 10, discount_pct: 15}]
+    expect: {total: 3060.00, first_invoice: 3060.00, approver: deal_desk}
+
+  - name: Team below seat minimum cannot be quoted
+    start: 2027-03-01
+    lines: [{sku: INS-TEAM, quantity: 3}]
+    expect: {error: below minimum}
+
+  - name: API usage crosses graduated tier boundaries
+    start: 2027-03-01
+    lines: [{sku: INS-API}]
+    usage: {INS-API: [50, 100, 101, 1500]}
+    expect: {total: 4302.50, first_invoice: 150.00, approver: auto}
+
+  - name: Enterprise commit runs out mid-month in year 1
+    start: 2027-03-01
+    lines: [{sku: INS-ENT}]
+    usage: {INS-API: [3500, 3500, 3500, 3500, 3500, 3500, 3500, 3500, 3500, 3500, 3500, 3500]}
+    expect: {total: 297000.00, first_invoice: 60000.00}
+
+  - name: Enterprise ramp with zero usage still bills every commit year
+    start: 2027-03-01
+    lines: [{sku: INS-ENT}]
+    expect: {total: 270000.00, first_invoice: 60000.00}
+
+  - name: Commit and pay-as-you-go for the same usage on one quote is rejected
+    start: 2027-03-01
+    lines: [{sku: INS-ENT}, {sku: INS-API}]
+    expect: {error: also draws down a commit}
+
+  - name: Discount above the top band cannot be approved
+    start: 2027-03-01
+    lines: [{sku: INS-SUPPORT-PREM, discount_pct: 40}]
+    expect: {total: 3600.00, approver: reject}

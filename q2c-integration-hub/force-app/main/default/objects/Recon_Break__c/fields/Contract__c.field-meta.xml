@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Contract__c</fullName>
+    <label>Contract</label>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <referenceTo>Q2C_Contract__c</referenceTo>
+    <relationshipLabel>Reconciliation Breaks</relationshipLabel>
+    <relationshipName>Recon_Breaks</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>

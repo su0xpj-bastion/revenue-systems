@@ -1,0 +1,2 @@
+# Only for the stripe-sync / stripe-parity commands
+stripe>=11.0

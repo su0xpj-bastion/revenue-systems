@@ -1,0 +1,53 @@
+name: gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: gtm-release-control
+
+jobs:
+  lane-gate:
+    name: lane-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Gate logic comes from the base branch, never from the PR being judged.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check approval evidence for the lane
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUSINESS_APPROVERS: ${{ vars.BUSINESS_APPROVERS }}
+          CLASSIFIER_ACTOR: ${{ vars.CLASSIFIER_ACTOR }}
+        run: |
+          python gate/check_gate.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --output gate.json
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-${{ github.run_attempt }}
+          path: gtm-release-control/gate.json
+          retention-days: 90
