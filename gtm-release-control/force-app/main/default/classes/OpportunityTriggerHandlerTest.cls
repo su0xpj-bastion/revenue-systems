@@ -105,4 +105,27 @@ private class OpportunityTriggerHandlerTest {
 
         Assert.isTrue(queries <= 1, 'Handler must not query per record; used ' + queries);
     }
+
+    @IsTest
+    static void mixedBatchBlocksOnlyTheReopenedRecords() {
+        List<Opportunity> opps = insertOpportunities(wonStage());
+        String reopenTo = openStage();
+        for (Integer i = 0; i < opps.size(); i++) {
+            if (Math.mod(i, 2) == 0) {
+                opps[i].StageName = reopenTo;
+            } else {
+                opps[i].Amount = 5000;
+            }
+        }
+
+        Test.startTest();
+        List<Database.SaveResult> results = Database.update(opps, false);
+        Test.stopTest();
+
+        for (Integer i = 0; i < results.size(); i++) {
+            Boolean reopened = Math.mod(i, 2) == 0;
+            Assert.areEqual(!reopened, results[i].isSuccess(),
+                'Record ' + i + ': only reopen attempts may fail');
+        }
+    }
 }
